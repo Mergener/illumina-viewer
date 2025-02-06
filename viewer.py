@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, Menu
+from tkinter import ttk, filedialog, Menu, font
 import sqlite3
 import chess
 from chessboard import display
@@ -187,33 +187,50 @@ class ChessTreeVisualizer:
 
         cursor = self.conn.cursor()
         cursor.execute("""
-            SELECT node_index, last_move 
+            SELECT node_index, last_move, pv 
             FROM nodes 
             WHERE tree = ? AND parent_index = ?
             ORDER BY node_index
         """, (self.selected_tree['id'], self.current_node_index))
         children = cursor.fetchall()
+        
         best_move = self.current_node_data.get('best_move', '')
-
         current_board = self.get_current_board()
 
         num_columns = 10
+        style = ttk.Style()
+        style.configure("PV.TButton", font=("Arial", 10, "bold")) 
+        style.configure("BestMove.TButton", font=("Arial", 10, "bold"), background="lightgreen") 
+
         for i, child in enumerate(children):
             move = child['last_move']
+            is_pv = child['pv'] == 1 
+            is_best_move = move == best_move  
+
             try:
                 move_label = current_board.san(current_board.parse_uci(move))
             except:
                 move_label = move
-            label = f"{move_label}!" if move == best_move else move_label
+
+            label = move_label
+
             btn = ttk.Button(
                 self.child_buttons_frame,
                 text=label,
                 command=lambda idx=child['node_index'], m=move: self.navigate_to_child(idx, m)
             )
-            btn.grid(row=i//num_columns, column=i%num_columns, padx=2, pady=2, sticky="nsew")
+
+            if is_pv:
+                btn.configure(style="PV.TButton")
+
+            if is_pv and is_best_move:
+                btn.configure(style="BestMove.TButton")  
+
+            btn.grid(row=i // num_columns, column=i % num_columns, padx=2, pady=2, sticky="nsew")
 
         for col in range(min(num_columns, len(children))):
             self.child_buttons_frame.columnconfigure(col, weight=1)
+
 
     def navigate_to_child(self, child_index, move):
         self.current_moves.append(move)
