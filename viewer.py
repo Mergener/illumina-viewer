@@ -168,7 +168,7 @@ class ChessTreeVisualizer:
         for move_uci in self.current_moves:
             try:
                 move = chess.Move.from_uci(move_uci)
-                if move in board.legal_moves:
+                if move in board.legal_moves or move_uci == '0000':
                     board.push(move)
                 else:
                     print(f"Illegal move {move_uci} in position {board.fen()}")
