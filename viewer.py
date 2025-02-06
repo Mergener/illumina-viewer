@@ -187,7 +187,7 @@ class ChessTreeVisualizer:
 
         cursor = self.conn.cursor()
         cursor.execute("""
-            SELECT node_index, last_move, pv 
+            SELECT *
             FROM nodes 
             WHERE tree = ? AND parent_index = ?
             ORDER BY node_index
@@ -210,9 +210,23 @@ class ChessTreeVisualizer:
             try:
                 move_label = current_board.san(current_board.parse_uci(move))
             except:
-                move_label = move
+                # Some older versions of Illumina didn't properly store null moves.
+                # If an invalid move is parsed here, it is safe to assume that the last
+                # move was a null move.
+                move = '0000'
+                move_label = current_board.san(move)
+
+            # Handle null moves.
+            if move == '0000':
+                move_label = "Null"
 
             label = move_label
+
+            skipped_move = child['skip_move']
+            if skipped_move != '0000':
+                current_board.push_uci(move)
+                label += f" (-{current_board.san(current_board.parse_uci(skipped_move))})"
+                current_board.pop()
 
             btn = ttk.Button(
                 self.child_buttons_frame,
