@@ -265,19 +265,29 @@ class ChessTreeVisualizer:
     def generate_node_detail_line(self, key, value):
         def get_prev_board():
             curr_board = self.get_current_board()
+            if len(curr_board.move_stack) == 0:
+                return None
             curr_board.pop()
             return curr_board
+
+        def uci_to_san(uci_str, board):
+            if not board:
+                return 'Null'
+            move = chess.Move.from_uci(uci_str)
+            if not board.is_pseudo_legal(move):
+                return 'Null'
+            return board.san(move)
 
         node_detail_value_composers = {
             'qsearch': lambda v: True if v else False,
             'pv': lambda v: True if v else False,
-            'last_move': lambda v: 'Null' if v == '0000' else get_prev_board().san(chess.Move.from_uci(v)),
-            'best_move': lambda v: 'Null' if v == '0000' else self.get_current_board().san(chess.Move.from_uci(v)),
+            'last_move': lambda v: uci_to_san(v, get_prev_board()),
+            'best_move': lambda v: uci_to_san(v, self.get_current_board()),
             'found_in_tt': lambda v: True if v else False,
             'tt_cutoff': lambda v: True if v else False,
             'improving': lambda v: True if v else False,
             'in_check': lambda v: True if v else False,
-            'skip_move': lambda v: 'Null' if v == '0000' else self.get_current_board().san(chess.Move.from_uci(v)),
+            'skip_move': lambda v: uci_to_san(v, self.get_current_board()),
         }
         default_composer = lambda v: self.generate_generic_node_detail_value_string(v)
 
@@ -293,3 +303,4 @@ if __name__ == "__main__":
     board_display = display.start()
     root.mainloop()
     display.terminate()
+    
