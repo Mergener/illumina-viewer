@@ -214,7 +214,7 @@ class ChessTreeVisualizer:
                 # If an invalid move is parsed here, it is safe to assume that the last
                 # move was a null move.
                 move = '0000'
-                move_label = current_board.san(move)
+                move_label = 'Null'
 
             # Handle null moves.
             if move == '0000':
