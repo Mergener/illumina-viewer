@@ -74,6 +74,7 @@ class ChessTreeVisualizer:
         details_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         self.node_details_text = tk.Text(details_frame, wrap=tk.WORD)
+        self.node_details_text.config(state=tk.DISABLED)
         scrollbar = ttk.Scrollbar(details_frame, orient=tk.VERTICAL, command=self.node_details_text.yview)
         self.node_details_text.configure(yscrollcommand=scrollbar.set)
         self.node_details_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -255,9 +256,35 @@ class ChessTreeVisualizer:
         exclude_keys = {'node_index', 'tree', 'parent_index'}
         for key, value in self.current_node_data.items():
             if key not in exclude_keys:
-                details.append(f"{key}: {value}")
+                details.append(self.generate_node_detail_line(key, value))
+        self.node_details_text.config(state=tk.NORMAL)
         self.node_details_text.delete(1.0, tk.END)
         self.node_details_text.insert(tk.END, '\n'.join(details))
+        self.node_details_text.config(state=tk.DISABLED)
+
+    def generate_node_detail_line(self, key, value):
+        def get_prev_board():
+            curr_board = self.get_current_board()
+            curr_board.pop()
+            return curr_board
+
+        node_detail_value_composers = {
+            'qsearch': lambda v: True if v else False,
+            'pv': lambda v: True if v else False,
+            'last_move': lambda v: 'Null' if v == '0000' else get_prev_board().san(chess.Move.from_uci(v)),
+            'best_move': lambda v: 'Null' if v == '0000' else self.get_current_board().san(chess.Move.from_uci(v)),
+            'found_in_tt': lambda v: True if v else False,
+            'tt_cutoff': lambda v: True if v else False,
+            'improving': lambda v: True if v else False,
+            'in_check': lambda v: True if v else False,
+            'skip_move': lambda v: 'Null' if v == '0000' else self.get_current_board().san(chess.Move.from_uci(v)),
+        }
+        default_composer = lambda v: self.generate_generic_node_detail_value_string(v)
+
+        return f"{key}: {node_detail_value_composers.get(key, default_composer)(value)}"
+
+    def generate_generic_node_detail_value_string(self, v):
+        return v
 
 if __name__ == "__main__":
     global board_display
