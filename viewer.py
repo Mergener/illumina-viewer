@@ -3,6 +3,35 @@ from tkinter import ttk, filedialog, Menu, font
 import sqlite3
 import chess
 from chessboard import display
+from datetime import datetime
+import time
+from functools import cmp_to_key
+
+def compare_trees(t1, t2):
+    if t1['depth'] > t2['depth']:
+        return -1
+    if t1['depth'] < t2['depth']:
+        return 1
+
+    if t1['multipv'] < t2['multipv']:
+        return -1
+    else:
+        return 1
+
+    t1_bounds_delta = t1['beta'] - t1['alpha']
+    t2_bounds_delta = t2['beta'] - t2['alpha']
+    if t1_bounds_delta > t2_bounds_delta:
+        return -1
+    if t1_bounds_delta < t2_bounds_delta:
+        return 1
+
+    return 0
+
+def utc2local(s):
+    utc = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+    epoch = time.mktime(utc.timetuple())
+    offset = datetime.fromtimestamp(epoch) - datetime.utcfromtimestamp(epoch)
+    return utc + offset
 
 class ChessTreeVisualizer:
     def __init__(self, root):
@@ -45,9 +74,9 @@ class ChessTreeVisualizer:
         search_frame = ttk.Frame(self.root)
         search_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
+        ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT, fill=tk.X)
         self.search_combo = ttk.Combobox(search_frame, state='readonly')
-        self.search_combo.pack(side=tk.LEFT, padx=5)
+        self.search_combo.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         self.search_combo.bind('<<ComboboxSelected>>', self.on_search_selected)
 
         # Tree selection.
@@ -56,8 +85,17 @@ class ChessTreeVisualizer:
 
         ttk.Label(tree_frame, text="Tree:").pack(side=tk.LEFT)
         self.tree_combo = ttk.Combobox(tree_frame, state='readonly')
-        self.tree_combo.pack(side=tk.LEFT, padx=5)
+        self.tree_combo.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         self.tree_combo.bind('<<ComboboxSelected>>', self.on_tree_selected)
+
+        # Fen frame
+        fen_frame = ttk.Frame(self.root)
+        fen_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Label(fen_frame, text="FEN:").pack(side=tk.LEFT)
+        self.fen_entry = tk.Text(fen_frame, height=1)
+        self.fen_entry.pack(side=tk.LEFT, fill=tk.X, padx=5, expand=True)
+        self.fen_entry.config(state=tk.DISABLED)
 
         # Navigation buttons.
         nav_frame = ttk.Frame(self.root)
@@ -92,9 +130,9 @@ class ChessTreeVisualizer:
 
     def load_searches(self):
         cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM searches ORDER BY id")
+        cursor.execute("SELECT * FROM searches ORDER BY time_of_creation DESC")
         self.searches = cursor.fetchall()
-        search_list = [f"{row['root_fen']}" for row in self.searches]
+        search_list = [f"{utc2local(row['time_of_creation'])} - {row['root_fen']} (id {row['id']})" for row in self.searches]
         self.search_combo['values'] = search_list
         if self.searches:
             self.search_combo.current(0)
@@ -109,9 +147,9 @@ class ChessTreeVisualizer:
 
     def load_trees(self):
         cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM trees WHERE search = ? ORDER BY id", (self.selected_search['id'],))
+        cursor.execute("SELECT * FROM trees WHERE search = ? ORDER BY root_depth DESC", (self.selected_search['id'],))
         self.trees = cursor.fetchall()
-        tree_list = [f"Depth {row['root_depth']}" for row in self.trees]
+        tree_list = [f"Depth {row['root_depth']} -- a: {row['asp_alpha']} b: {row['asp_beta']} multipv {row['multipv']}" for row in self.trees]
         self.tree_combo['values'] = tree_list
         if self.trees:
             self.tree_combo.current(0)
@@ -180,7 +218,12 @@ class ChessTreeVisualizer:
         return board        
 
     def update_chessboard(self):
-        display.update(self.get_current_board().fen(), board_display)
+        curr_board = self.get_current_board()
+        self.fen_entry.config(state=tk.NORMAL)
+        self.fen_entry.delete("1.0", tk.END)
+        self.fen_entry.insert(tk.END, curr_board.fen())
+        self.fen_entry.config(state=tk.DISABLED)
+        display.update(curr_board.fen(), board_display)
 
     def update_child_buttons(self):
         for widget in self.child_buttons_frame.winfo_children():
@@ -288,6 +331,8 @@ class ChessTreeVisualizer:
             'improving': lambda v: True if v else False,
             'in_check': lambda v: True if v else False,
             'skip_move': lambda v: uci_to_san(v, self.get_current_board()),
+            'tt_bound': lambda v: ['Exact', 'Upperbound', 'Lowerbound'][v],
+            'tt_move': lambda v: uci_to_san(v, self.get_current_board()),
         }
         default_composer = lambda v: self.generate_generic_node_detail_value_string(v)
 
