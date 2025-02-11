@@ -254,13 +254,9 @@ class ChessTreeVisualizer:
             try:
                 move_label = current_board.san(current_board.parse_uci(move))
             except:
-                # Some older versions of Illumina didn't properly store null moves.
-                # If an invalid move is parsed here, it is safe to assume that the last
-                # move was a null move.
                 move = '0000'
                 move_label = 'Null'
 
-            # Handle null moves.
             if move == '0000':
                 move_label = "Null"
 
@@ -272,23 +268,41 @@ class ChessTreeVisualizer:
                 label += f" (-{current_board.san(current_board.parse_uci(skipped_move))})"
                 current_board.pop()
 
+            # Calculate score text
+            score = child['score']
+            alpha = child['alpha']
+            beta = child['beta']
+            if score >= beta:
+                score_text = f"<= {-score}"
+            elif score <= alpha:
+                score_text = f">= {-score}"
+            else:
+                score_text = f"= {-score}"
+
+            # Create container frame for button and label
+            container = ttk.Frame(self.child_buttons_frame)
+            container.grid(row=i // num_columns, column=i % num_columns, padx=2, pady=2, sticky="nsew")
+
+            # Create button inside container
             btn = ttk.Button(
-                self.child_buttons_frame,
+                container,
                 text=label,
                 command=lambda idx=child['node_index'], m=move: self.navigate_to_child(idx, m)
             )
 
             if is_pv:
                 btn.configure(style="PV.TButton")
-
             if is_pv and is_best_move:
                 btn.configure(style="BestMove.TButton")  
 
-            btn.grid(row=i // num_columns, column=i % num_columns, padx=2, pady=2, sticky="nsew")
+            btn.pack(side='top', fill='both', expand=True)
+
+            # Create score label
+            score_label = ttk.Label(container, text=score_text, font=('Arial', 8), justify='center')
+            score_label.pack(side='bottom', fill='x')
 
         for col in range(min(num_columns, len(children))):
             self.child_buttons_frame.columnconfigure(col, weight=1)
-
 
     def navigate_to_child(self, child_index, move):
         self.current_moves.append(move)
