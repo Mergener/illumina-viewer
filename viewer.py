@@ -279,6 +279,8 @@ class ChessTreeVisualizer:
             else:
                 score_text = f"= {-score}"
 
+            score_text += f", d={child['depth']}"
+
             # Create container frame for button and label
             container = ttk.Frame(self.child_buttons_frame)
             container.grid(row=i // num_columns, column=i % num_columns, padx=2, pady=2, sticky="nsew")
